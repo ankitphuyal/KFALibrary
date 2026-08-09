@@ -1,0 +1,17 @@
+1. What does encapsulation provide?
+
+Encapsulation keeps the fields of the Book class private
+so they cannot be directly changed from outside the class.
+Getters and setters provide controlled access, such as preventing a negative price from being assigned.
+
+2. Difference between a class and an object
+
+A class is a blueprint or template that defines the properties
+and behavior of a book. An object is a real instance created
+from that class, such as new Book("Clean Code", "Robert Martin", "B001", 850.00).
+
+3. Why is totalBooks static?
+
+totalBooks is static because it should be shared by all Book objects.
+If it were an instance field, every book would have its own separate
+counter, so the program could not maintain one common total for all books.
