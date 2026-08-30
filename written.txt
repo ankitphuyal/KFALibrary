@@ -15,3 +15,43 @@ from that class, such as new Book("Clean Code", "Robert Martin", "B001", 850.00)
 totalBooks is static because it should be shared by all Book objects.
 If it were an instance field, every book would have its own separate
 counter, so the program could not maintain one common total for all books.
+
+A3: CONCEPT CHECK
+
+1. Why do kiosk threads finish in an unpredictable order?
+
+Threads run concurrently, and the JVM/operating system decides which thread
+gets CPU time. Therefore, even if the threads are started in a fixed order,
+their execution and completion order can be different.
+
+2. Name the six states of a Java thread...
+
+The six thread states are NEW, RUNNABLE, BLOCKED, WAITING, TIMED_WAITING,
+and TERMINATED. A thread moves from RUNNABLE to TIMED_WAITING when it
+performs a timed operation such as Thread.sleep(), wait(timeout), or
+join(timeout).
+
+3. Why does calling run() directly not give you concurrency?
+
+Calling run() directly is just a normal method call, so it executes on the
+current thread instead of creating a new thread. Only start() creates a new
+thread and then causes that new thread to execute the run() method.
+
+1. Difference between wait() and sleep():
+
+wait() releases the object's lock while the thread waits, allowing another
+ thread to use the object. sleep() pauses the current thread for a specified
+ time but does not release any lock that the thread already holds.
+
+2. Why notifyAll() is safer than notify():
+
+notifyAll() is generally safer than notify() because it wakes all threads
+ waiting on the same object, allowing each thread to re-check its condition.
+ This is especially useful when different types of threads may be waiting for
+ different conditions.
+
+3. Why while instead of if:
+
+wait() should be inside a while loop because the condition must be
+ checked again after the thread wakes up. Another thread may have changed
+  the shared buffer before the awakened thread gets the lock again.
