@@ -1,3 +1,12 @@
+import kfa.concurrency.Librarian;
+import kfa.concurrency.KioskReturn;
+import kfa.concurrency.ReturnsCart;
+
+import kfa.concurrency.KioskWorker;
+import kfa.concurrency.ReportWorker;
+import kfa.concurrency.CopyCountTask;
+import kfa.concurrency.BorrowCollectionDemo;
+
 import kfa.exception.BookNotAvailableException;
 import kfa.exception.ItemOverdueException;
 import kfa.model.Book;
@@ -5,6 +14,14 @@ import kfa.model.DVD;
 import kfa.model.LibraryItem;
 import kfa.model.Magazine;
 import kfa.service.LibrarySystem;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 
 public class Main {
 
@@ -248,7 +265,7 @@ public class Main {
         );
 
         System.out.println(
-                "Amamul Khan -> AMAKH445"
+                "Ankit  -> AMAKH445"
         );
 
         System.out.println(
@@ -591,7 +608,7 @@ public class Main {
         );
 
         System.out.println(
-                "Aarav Khan -> "
+                "Ankit -> "
                         + generateMemberId("Aarav Khan")
         );
 
@@ -647,9 +664,555 @@ public class Main {
                         + "StringBuilder modifies the same mutable object."
         );
 
+
+// ========================================
+// SECTION A: THREADS & THREAD LIFECYCLE
+// ========================================
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("   SECTION A: THREADS & THREAD LIFECYCLE");
+        System.out.println("========================================");
+
+        // === A1: TWO WAYS TO CREATE A THREAD ===
+
+        System.out.println();
+        System.out.println("=== A1: TWO WAYS TO CREATE A THREAD ===");
+
+        KioskWorker kiosk1 = new KioskWorker("Kiosk-1");
+        KioskWorker kiosk2 = new KioskWorker("Kiosk-2");
+        KioskWorker kiosk3 = new KioskWorker("Kiosk-3");
+
+        kiosk1.setName("KioskThread-1");
+        kiosk2.setName("KioskThread-2");
+        kiosk3.setName("KioskThread-3");
+
+        ReportWorker report1 =
+                new ReportWorker("Nightly Report 1");
+
+        ReportWorker report2 =
+                new ReportWorker("Nightly Report 2");
+
+        Thread reportThread1 =
+                new Thread(report1, "ReportThread-1");
+
+        Thread reportThread2 =
+                new Thread(report2, "ReportThread-2");
+
+
+// === A2: LIFECYCLE AND PRIORITY ===
+
+        System.out.println();
+        System.out.println("=== A2: LIFECYCLE AND PRIORITY ===");
+
+// Set thread priorities
+        kiosk1.setPriority(Thread.MAX_PRIORITY);
+        kiosk2.setPriority(Thread.MIN_PRIORITY);
+
+        System.out.println(
+                "KioskThread-1 priority: "
+                        + kiosk1.getPriority()
+        );
+
+        System.out.println(
+                "KioskThread-2 priority: "
+                        + kiosk2.getPriority()
+        );
+
+// Check state before start
+        System.out.println(
+                "KioskThread-1 state before start: "
+                        + kiosk1.getState()
+        );
+
+
+// Start threads
+        kiosk1.start();
+
+        System.out.println(
+                "KioskThread-1 state after start: "
+                        + kiosk1.getState()
+        );
+
+        kiosk2.start();
+        kiosk3.start();
+
+        reportThread1.start();
+        reportThread2.start();
+
+
+// Wait for all threads to finish
+        try {
+            kiosk1.join();
+            kiosk2.join();
+            kiosk3.join();
+            reportThread1.join();
+            reportThread2.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.println("All KFA services closed for the night.");
+
+
+// Thread priority is only a scheduling hint.
+// MAX_PRIORITY does not guarantee that the thread
+// will finish before MIN_PRIORITY.
+// The JVM/operating system controls the actual execution order.
+
+        // ========================================
+// B1: RACE CONDITION TEST
+// ========================================
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("       B1: RACE CONDITION TEST");
+        System.out.println("========================================");
+
+// One popular book with 3 physical copies
+        Book popularBook = new Book(
+                "Java Programming",
+                "James Gosling",
+                "B100",
+                1500
+        );
+
+// Create 10 kiosk threads
+        Thread[] kiosks = new Thread[10];
+
+// Count successful borrows
+        AtomicInteger successfulBorrows =
+                new AtomicInteger(0);
+
+// Create 10 kiosk threads
+        for (int i = 0; i < 10; i++) {
+
+            final int kioskNumber = i + 1;
+
+            kiosks[i] = new Thread(() -> {
+
+                boolean success =
+                        popularBook.borrowCopy();
+
+                if (success) {
+                    successfulBorrows.incrementAndGet();
+                }
+
+                System.out.println(
+                        "Kiosk " + kioskNumber
+                                + " borrow result: "
+                                + success
+                );
+            });
+        }
+
+// Start all 10 kiosk threads
+        for (Thread kiosk : kiosks) {
+            kiosk.start();
+        }
+
+// Wait for all threads to finish
+        for (Thread kiosk : kiosks) {
+
+            try {
+                kiosk.join();
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+// Print results
+        System.out.println();
+        System.out.println(
+                "Successful borrows: "
+                        + successfulBorrows.get()
+        );
+
+        System.out.println(
+                "Copies remaining: "
+                        + popularBook.getCopiesAvailable()
+        );
+
+        /*
+         * B1 Race Condition:
+         *
+         * borrowCopy() is not synchronized.
+         * Multiple kiosk threads can check copiesAvailable > 0
+         * at almost the same time before another thread decreases it.
+         *
+         * Therefore, more than 3 successful borrows may occur even
+         * though the book started with only 3 physical copies.
+         */
+// ========================================
+// SECTION C: INTER-THREAD COMMUNICATION
+// ========================================
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println(" SECTION C: INTER-THREAD COMMUNICATION");
+        System.out.println("========================================");
+
+// ========================================
+// C1 + C2: RETURNS CART
+// ========================================
+
+        ReturnsCart cart = new ReturnsCart(5);
+
+// Each kiosk produces 4 returns
+        String[] kiosk1Books = {
+                "Clean Code",
+                "Java Basics",
+                "Effective Java",
+                "Head First Java"
+        };
+
+        String[] kiosk2Books = {
+                "Python Programming",
+                "Algorithms",
+                "Database Systems",
+                "Computer Networks"
+        };
+
+        String[] kiosk3Books = {
+                "Operating Systems",
+                "Data Structures",
+                "JavaScript Guide",
+                "Software Engineering"
+        };
+
+// Create librarian
+// Total returns = 4 + 4 + 4 = 12
+        Librarian librarian =
+                new Librarian(cart, 12);
+
+// Create 3 producer kiosks
+        KioskReturn kioskReturn1 =
+                new KioskReturn(
+                        cart,
+                        "KioskReturn-1",
+                        kiosk1Books
+                );
+
+        KioskReturn kioskReturn2 =
+                new KioskReturn(
+                        cart,
+                        "KioskReturn-2",
+                        kiosk2Books
+                );
+
+        KioskReturn kioskReturn3 =
+                new KioskReturn(
+                        cart,
+                        "KioskReturn-3",
+                        kiosk3Books
+                );
+
+// Create threads
+        Thread librarianThread =
+                new Thread(
+                        librarian,
+                        "LibrarianThread"
+                );
+
+        Thread kioskThread1 =
+                new Thread(
+                        kioskReturn1,
+                        "KioskReturn-1"
+                );
+
+        Thread kioskThread2 =
+                new Thread(
+                        kioskReturn2,
+                        "KioskReturn-2"
+                );
+
+        Thread kioskThread3 =
+                new Thread(
+                        kioskReturn3,
+                        "KioskReturn-3"
+                );
+
+// Start all threads
+        librarianThread.start();
+
+        kioskThread1.start();
+        kioskThread2.start();
+        kioskThread3.start();
+
+// Wait for all threads to finish
+        try {
+
+            kioskThread1.join();
+            kioskThread2.join();
+            kioskThread3.join();
+
+            librarianThread.join();
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.println();
+        System.out.println(
+                "C2 complete: All returns were produced "
+                        + "and processed."
+        );
+
+// ========================================
+// C3: EXPLANATION
+// ========================================
+
+        System.out.println();
+        System.out.println("=== C3: CONCEPT CHECK ===");
+
+        System.out.println(
+                "wait() releases the object's lock while the "
+                        + "thread waits, whereas sleep() pauses the "
+                        + "thread without releasing the lock it holds."
+        );
+
+        System.out.println(
+                "notifyAll() is generally safer than notify() "
+                        + "because it wakes all waiting threads so "
+                        + "each can re-check its condition."
+        );
+
+// ========================================
+// END
+// ========================================
+
+// ========================================
+// SECTION D: THREAD POOLS & CONCURRENT COLLECTIONS
+// ========================================
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println(
+                " SECTION D: THREAD POOLS & CONCURRENT COLLECTIONS"
+        );
+        System.out.println("========================================");
+
+// ========================================
+// D1: EXECUTOR SERVICE
+// ========================================
+
+        System.out.println();
+        System.out.println("=== D1: EXECUTOR SERVICE ===");
+
+// Create a fixed thread pool containing 4 threads
+        ExecutorService executor =
+                Executors.newFixedThreadPool(4);
+
+// Submit 8 kiosk transaction tasks
+        for (int i = 1; i <= 8; i++) {
+
+            final int transactionNumber = i;
+
+            executor.submit(() -> {
+
+                System.out.println(
+                        Thread.currentThread().getName()
+                                + " processing transaction "
+                                + transactionNumber
+                );
+
+                // Simulate a short kiosk transaction
+                try {
+
+                    Thread.sleep(200);
+
+                } catch (InterruptedException e) {
+
+                    Thread.currentThread().interrupt();
+                }
+
+                System.out.println(
+                        Thread.currentThread().getName()
+                                + " completed transaction "
+                                + transactionNumber
+                );
+            });
+        }
+
+// No more tasks will be submitted
+        executor.shutdown();
+
+// Wait for all submitted tasks to finish
+        try {
+
+            if (executor.awaitTermination(
+                    10,
+                    TimeUnit.SECONDS)) {
+
+                System.out.println(
+                        "All 8 kiosk transactions completed."
+                );
+
+            } else {
+
+                System.out.println(
+                        "Some transactions did not finish in time."
+                );
+            }
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.println(
+                "D1 complete: ExecutorService used successfully."
+        );
+
+        /*
+         * D1 Explanation:
+         *
+         * A fixed pool of 4 threads reuses the same threads for
+         * 8 or more short tasks. This is generally more efficient
+         * than creating a new Thread object for every transaction.
+         */
+
+
+// ========================================
+// D2: CALLABLE AND FUTURE
+// ========================================
+
+        System.out.println();
+        System.out.println("=== D2: CALLABLE AND FUTURE ===");
+
+// Create a small library catalogue
+        LibraryItem[] copyCatalogue = {
+
+                new Book(
+                        "Clean Code",
+                        "Robert Martin",
+                        "B001",
+                        850
+                ),
+
+                new Book(
+                        "Effective Java",
+                        "Joshua Bloch",
+                        "B002",
+                        1200
+                ),
+
+                new Book(
+                        "Java Basics",
+                        "Herbert Schildt",
+                        "B003",
+                        950
+                ),
+
+                new Book(
+                        "Head First Java",
+                        "Kathy Sierra",
+                        "B004",
+                        1100
+                )
+        };
+
+// Create ExecutorService
+        ExecutorService copyExecutor =
+                Executors.newFixedThreadPool(4);
+
+// Create Callable task
+        Callable<Integer> copyCountTask =
+                new CopyCountTask(copyCatalogue);
+
+// Submit Callable task
+        Future<Integer> future =
+                copyExecutor.submit(copyCountTask);
+
+// Get result from Future
+        try {
+
+            int totalCopies = future.get();
+
+            System.out.println(
+                    "Total available copies: "
+                            + totalCopies
+            );
+
+        } catch (Exception e) {
+
+            System.out.println(
+                    "Copy count task failed: "
+                            + e.getMessage()
+            );
+        }
+
+// Shutdown executor
+        copyExecutor.shutdown();
+
+// Wait for executor to finish
+        try {
+
+            copyExecutor.awaitTermination(
+                    5,
+                    TimeUnit.SECONDS
+            );
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.println(
+                "D2 complete: Callable and Future used successfully."
+        );
+
+        /*
+         * D2 Explanation:
+         *
+         * future.get() waits for the Callable task to finish if
+         * it has not finished yet, then returns its result.
+         *
+         * Unlike Runnable, Callable can return a value through Future.
+         */
+
+
+// ========================================
+// D3: THREAD-SAFE COLLECTION
+// ========================================
+
+        System.out.println();
+        System.out.println("=== D3: THREAD-SAFE COLLECTION ===");
+
+// Run the ConcurrentHashMap test
+        BorrowCollectionDemo.runTest();
+
+        System.out.println(
+                "D3 complete: Thread-safe collection used successfully."
+        );
+
+        /*
+         * D3 Explanation:
+         *
+         * An ordinary HashMap or HashSet is unsafe when multiple
+         * threads modify it concurrently because its internal state
+         * can become inconsistent.
+         *
+         * Concurrent modifications, especially during resizing,
+         * can cause lost or corrupted data. ConcurrentHashMap
+         * provides thread-safe operations for concurrent access.
+         */
+
+
+// ========================================
+// SECTION D COMPLETE
+// ========================================
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println(" SECTION D COMPLETE");
+        System.out.println("========================================");
+
         System.out.println();
         System.out.println("ALL SECTIONS COMPLETED");
-    }
+        }
     // === A1: SANITIZE TITLE METHOD ===
 
     public static String sanitizeTitle(String raw) {
